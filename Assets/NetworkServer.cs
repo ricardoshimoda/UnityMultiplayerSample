@@ -11,14 +11,15 @@ public class NetworkServer : MonoBehaviour
 
     void Start ()
     {
+        Debug.Log("Before Start");
         m_Driver = new UdpNetworkDriver(new INetworkParameter[0]);
         var endpoint = NetworkEndPoint.AnyIpv4;
-        endpoint.Port = 12345;
+        endpoint.Port = 12666;
         if (m_Driver.Bind(endpoint) != 0)
-            Debug.Log("Failed to bind to port 9000");
+            Debug.Log("Failed to bind to port 12666");
         else
             m_Driver.Listen();
-
+        Debug.Log("After Start");
         m_Connections = new NativeList<NetworkConnection>(16, Allocator.Persistent);
     }
 
@@ -30,6 +31,7 @@ public class NetworkServer : MonoBehaviour
 
     void Update ()
     {
+        Debug.Log("Server is active!");
         m_Driver.ScheduleUpdate().Complete();
 
         // CleanUpConnections
@@ -52,26 +54,31 @@ public class NetworkServer : MonoBehaviour
         DataStreamReader stream;
         for (int i = 0; i < m_Connections.Length; i++)
         {
-            if (!m_Connections[i].IsCreated)
+            Debug.Log("Checking Connection " + i);
+
+            if (!m_Connections[i].IsCreated){
+                Debug.Log("The connection " + i + " somehow has not been created yet - wtf? ");
                 Assert.IsTrue(true);
+            }
 
             NetworkEvent.Type cmd;
             while ((cmd = m_Driver.PopEventForConnection(m_Connections[i], out stream)) !=
                    NetworkEvent.Type.Empty)
             {
+                Debug.Log("In the while loop to get messages");
                 if (cmd == NetworkEvent.Type.Data)
                 {
+                    Debug.Log("If we've received data then");
                     var readerCtx = default(DataStreamReader.Context);
-                    uint number = stream.ReadUInt(ref readerCtx);
-
+                    var number = stream.ReadString(ref readerCtx);
                     Debug.Log("Got " + number + " from the Client adding + 2 to it.");
-                    number +=2;
-
+                    //number +=2;
+                    /*
                     using (var writer = new DataStreamWriter(4, Allocator.Temp))
                     {
                         writer.Write(number);
                         m_Driver.Send(NetworkPipeline.Null, m_Connections[i], writer);
-                    }
+                    }*/
                 }
                 else if (cmd == NetworkEvent.Type.Disconnect)
                 {

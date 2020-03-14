@@ -14,7 +14,7 @@ public class NetworkClient : MonoBehaviour
         m_Driver = new UdpNetworkDriver(new INetworkParameter[0]);
         m_Connection = default(NetworkConnection);
 
-        var endpoint = NetworkEndPoint.Parse("52.15.219.197",12345);
+        var endpoint = NetworkEndPoint.Parse("34.236.164.9",12666);
         // endpoint.Port = 9000;
         m_Connection = m_Driver.Connect(endpoint);
     }
@@ -66,6 +66,8 @@ public class NetworkClient : MonoBehaviour
                 Debug.Log("Client got disconnected from server");
                 m_Connection = default(NetworkConnection);
             }
+            Debug.Log("Loop");
         }
+        Debug.Log("End of it all");
     }
 }
