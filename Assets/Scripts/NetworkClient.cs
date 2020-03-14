@@ -5,6 +5,9 @@ using Unity.Networking.Transport;
 
 public class NetworkClient : MonoBehaviour
 {
+    public string serverAddress = "127.0.0.1";
+    public ushort serverPort = 12666;
+
     public UdpNetworkDriver m_Driver;
     public NetworkConnection m_Connection;
     public bool m_Done;
@@ -14,7 +17,7 @@ public class NetworkClient : MonoBehaviour
         m_Driver = new UdpNetworkDriver(new INetworkParameter[0]);
         m_Connection = default(NetworkConnection);
 
-        var endpoint = NetworkEndPoint.Parse("34.236.164.9",12666);
+        var endpoint = NetworkEndPoint.Parse(serverAddress, serverPort);
         // endpoint.Port = 9000;
         m_Connection = m_Driver.Connect(endpoint);
     }
@@ -46,16 +49,17 @@ public class NetworkClient : MonoBehaviour
                 Debug.Log("We are now connected to the server");
 
                 var value = 1;
-                using (var writer = new DataStreamWriter(4, Allocator.Temp))
+                using (var writer = new DataStreamWriter(1024, Allocator.Temp))
                 {
-                    writer.Write(value);
+                    string jojojo = "Good day sunshine!";
+                    writer.WriteString(jojojo);
                     m_Connection.Send(m_Driver, writer);
                 }
             }
             else if (cmd == NetworkEvent.Type.Data)
             {
                 var readerCtx = default(DataStreamReader.Context);
-                uint value = stream.ReadUInt(ref readerCtx);
+                var value = stream.ReadUInt(ref readerCtx);
                 Debug.Log("Got the value = " + value + " back from the server");
                 m_Done = true;
                 m_Connection.Disconnect(m_Driver);
