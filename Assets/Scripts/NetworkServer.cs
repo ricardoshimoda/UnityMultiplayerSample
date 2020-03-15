@@ -10,9 +10,12 @@ using Unity.Networking.Transport;
 
 public class NetworkServer : MonoBehaviour
 {
+    private const int CAPACITY = 1024;
     public UdpNetworkDriver m_Driver;
     private NativeList<NetworkConnection> m_Connections;
     private Dictionary<int, Player> m_Players = new Dictionary<int, Player>();
+    private List<Player> m_DisconnectedPlayers = new List<Player>();
+    private bool dirty = false;
 
     void Start ()
     {
@@ -25,79 +28,85 @@ public class NetworkServer : MonoBehaviour
             m_Driver.Listen();
         m_Connections = new NativeList<NetworkConnection>(16, Allocator.Persistent);
     }
-
+    void SendDisconnectedPlayers()
+    {
+        string message = Messager.DisconnectedPlayers(m_DisconnectedPlayers);
+        for(int i = 0; i < m_Connections.Length; i++) {
+            using (var writer = new DataStreamWriter(CAPACITY, Allocator.Temp)) {
+                writer.WriteString(message);
+                m_Connections[i].Send(m_Driver, writer);
+            }
+        }
+    }
     public void OnDestroy()
     {
+        for (int i = 0; i < m_Connections.Length; i++){
+            m_DisconnectedPlayers.Add(m_Players[m_Connections[i].InternalId]);
+            m_Players.Remove(m_Connections[i].InternalId);
+        }
+        SendDisconnectedPlayers(); // Sends final message to all clients
         m_Driver.Dispose();
         m_Connections.Dispose();
     }
-
     void CleanUpConnections()
     {
         for (int i = 0; i < m_Connections.Length; i++)
         {
             if (!m_Connections[i].IsCreated)
             {
+                m_DisconnectedPlayers.Add(m_Players[m_Connections[i].InternalId]);
                 m_Players.Remove(m_Connections[i].InternalId);
                 Debug.Log("Connection lost with " + m_Connections[i].InternalId);
                 m_Connections.RemoveAtSwapBack(i);
                 --i;
             }
         }
+        SendDisconnectedPlayers();
     }
-
-    Player NewPlayer(int connId){
-        // This new player will be always created at 0,0,0 - I'm feeling lazy
-        var finalPlayer = new Player();
-        finalPlayer.id = connId.ToString();
-        finalPlayer.color = new ReceivedColor() {
-            R=Random.Range(0f,1f),
-            G=Random.Range(0f,1f),
-            B=Random.Range(0f,1f)
-        };
-        finalPlayer.position = new ServerPosition(){x=0,y=0,z=0};
-        return finalPlayer;
-    }
-
-    string NewPlayerMessage(Player player){
-        var MessageObj = new Message();
-        MessageObj.cmd = Commands.NEW_CLIENT;
-        MessageObj.players = new Player[]{ player };
-        return JsonUtility.ToJson(MessageObj);
-    }
-
     void SendNewChallenger(Player newPlayerData)
     {
-        string message = NewPlayerMessage(newPlayerData);
+        string message = Messager.NewPlayer(newPlayerData);
         for(int i = 0; i < m_Connections.Length; i++) {
-            using (var writer = new DataStreamWriter(1024, Allocator.Temp)) {
+            using (var writer = new DataStreamWriter(CAPACITY, Allocator.Temp)) {
                 writer.WriteString(message);
                 m_Connections[i].Send(m_Driver, writer);
             }
         }
     }
-
-    string FirstUpdateMessage()
+    void SendFirstUpdateMessage(NetworkConnection c)
     {
-        return "";
+        string message = Messager.UpdateOthers(m_Players);
+        using (var writer = new DataStreamWriter(CAPACITY, Allocator.Temp)) {
+            writer.WriteString(message);
+            c.Send(m_Driver, writer);
+        }
     }
-
+    void SendUpdateMessage()
+    {
+        string message = Messager.Update(m_Players);
+        for(int i = 0; i < m_Connections.Length; i++) {
+            using (var writer = new DataStreamWriter(CAPACITY, Allocator.Temp)) {
+                writer.WriteString(message);
+                m_Connections[i].Send(m_Driver, writer);
+            }
+        }
+    }
     void AcceptNewConnections (){
         NetworkConnection c;
         while ((c = m_Driver.Accept()) != default(NetworkConnection))
         {
             Debug.Log("Accepted a connection with the following data: ");
             Debug.Log("InternalId: " + c.InternalId);
-            m_Connections.Add(c);
 
-            var currentPlayer = NewPlayer(c.InternalId);
+            var currentPlayer = Player.NewPlayer(c.InternalId);
             Debug.Log("Tell other players of this new player");
-            //SendNewChallenger(currentPlayer);
+            SendNewChallenger(currentPlayer);
 
             Debug.Log("About to send info about exisitng players to the guy");
-
+            m_Connections.Add(c);
             m_Players.Add(c.InternalId, currentPlayer);
 
+            SendFirstUpdateMessage(c);
         }
     }
 
@@ -114,12 +123,19 @@ public class NetworkServer : MonoBehaviour
             {
                 Debug.Log("If we've received data then");
                 var readerCtx = default(DataStreamReader.Context);
-                var number = stream.ReadString(ref readerCtx);
-                Debug.Log("Got " + number + " from the Client");
+                var command = stream.ReadString(ref readerCtx);
+                Debug.Log("Got " + command + " from the Client: " + conn.InternalId);
+                var message = Decoder.Decode(command);
+                if (message != null && message.cmd == Commands.MOVEMENT){
+                    dirty = true;
+                    m_Players[conn.InternalId].position.x += message.movePlayer.x;
+                    m_Players[conn.InternalId].position.y += message.movePlayer.y;
+                }
             }
             else if (cmd == NetworkEvent.Type.Disconnect)
             {
                 Debug.Log("Client disconnected from server with id: " + conn.InternalId);
+                // Let's hope this will be later processed correctly at the disconnect thingie
                 conn = default(NetworkConnection);
             }
         }
@@ -134,6 +150,10 @@ public class NetworkServer : MonoBehaviour
                 Assert.IsTrue(true);
             }
             ReceiveData(i);
+        }
+        if(dirty){
+            dirty = false;
+            SendUpdateMessage();
         }
     }
 
