@@ -10,7 +10,6 @@ using Unity.Networking.Transport;
 
 public class NetworkServer : MonoBehaviour
 {
-    private const int CAPACITY = 1024;
     public UdpNetworkDriver m_Driver;
     private NativeList<NetworkConnection> m_Connections;
     private Dictionary<int, Player> m_Players = new Dictionary<int, Player>();
@@ -23,19 +22,17 @@ public class NetworkServer : MonoBehaviour
         var endpoint = NetworkEndPoint.AnyIpv4;
         endpoint.Port = 12666;
         if (m_Driver.Bind(endpoint) != 0)
-            Debug.Log("Failed to bind to port 12666");
+            Debug.Log("[SERVER] Failed to bind to port 12666");
         else
             m_Driver.Listen();
         m_Connections = new NativeList<NetworkConnection>(16, Allocator.Persistent);
     }
+
     void SendDisconnectedPlayers()
     {
         string message = Messager.DisconnectedPlayers(m_DisconnectedPlayers);
         for(int i = 0; i < m_Connections.Length; i++) {
-            using (var writer = new DataStreamWriter(CAPACITY, Allocator.Temp)) {
-                writer.WriteString(message);
-                m_Connections[i].Send(m_Driver, writer);
-            }
+            Sender.SendData(message, m_Driver, m_Connections[i]);
         }
     }
     public void OnDestroy()
@@ -56,7 +53,9 @@ public class NetworkServer : MonoBehaviour
             {
                 m_DisconnectedPlayers.Add(m_Players[m_Connections[i].InternalId]);
                 m_Players.Remove(m_Connections[i].InternalId);
-                Debug.Log("Connection lost with " + m_Connections[i].InternalId);
+                Debug.Log("[SERVER] Connection lost with " + m_Connections[i].InternalId);
+                //var connTemp = m_Connections[i];
+                //connTemp.Dispose();
                 m_Connections.RemoveAtSwapBack(i);
                 --i;
             }
@@ -67,45 +66,37 @@ public class NetworkServer : MonoBehaviour
     {
         string message = Messager.NewPlayer(newPlayerData);
         for(int i = 0; i < m_Connections.Length; i++) {
-            using (var writer = new DataStreamWriter(CAPACITY, Allocator.Temp)) {
-                writer.WriteString(message);
-                m_Connections[i].Send(m_Driver, writer);
-            }
+            Sender.SendData(message, m_Driver, m_Connections[i]);
         }
     }
     void SendFirstUpdateMessage(NetworkConnection c)
     {
         string message = Messager.UpdateOthers(m_Players);
-        using (var writer = new DataStreamWriter(CAPACITY, Allocator.Temp)) {
-            writer.WriteString(message);
-            c.Send(m_Driver, writer);
-        }
+        Sender.SendData(message, m_Driver, c);
     }
     void SendUpdateMessage()
     {
         string message = Messager.Update(m_Players);
         for(int i = 0; i < m_Connections.Length; i++) {
-            using (var writer = new DataStreamWriter(CAPACITY, Allocator.Temp)) {
-                writer.WriteString(message);
-                m_Connections[i].Send(m_Driver, writer);
-            }
+            Sender.SendData(message, m_Driver, m_Connections[i]);
         }
     }
     void AcceptNewConnections (){
         NetworkConnection c;
         while ((c = m_Driver.Accept()) != default(NetworkConnection))
         {
-            Debug.Log("Accepted a connection with the following data: ");
-            Debug.Log("InternalId: " + c.InternalId);
+            Debug.Log("[SERVER] Accepted a connection with the following data: ");
+            Debug.Log("[SERVER] InternalId: " + c.InternalId);
 
             var currentPlayer = Player.NewPlayer(c.InternalId);
             Debug.Log("Tell other players of this new player");
-            SendNewChallenger(currentPlayer);
-
-            Debug.Log("About to send info about exisitng players to the guy");
+            if(m_Connections.Length > 0){
+                SendNewChallenger(currentPlayer);
+            }
+            Debug.Log("[SERVER] Before adding new client to the list of connections and dictionary of game obejcts");
             m_Connections.Add(c);
             m_Players.Add(c.InternalId, currentPlayer);
-
+            Debug.Log("[SERVER] About to send info about exisitng players to the guy");
             SendFirstUpdateMessage(c);
         }
     }
@@ -118,14 +109,16 @@ public class NetworkServer : MonoBehaviour
         while ((cmd = m_Driver.PopEventForConnection(conn, out stream)) !=
                 NetworkEvent.Type.Empty)
         {
-            Debug.Log("In the while loop to get messages");
+            Debug.Log("[SERVER] In the while loop to get messages");
             if (cmd == NetworkEvent.Type.Data)
             {
-                Debug.Log("If we've received data then");
+                Debug.Log("[SERVER] If we've received data then");
                 var readerCtx = default(DataStreamReader.Context);
-                var command = stream.ReadString(ref readerCtx);
-                Debug.Log("Got " + command.ToString() + " from the Client: " + conn.InternalId);
-                var message = Decoder.Decode(command.ToString());
+                var infoBuffer = new byte[Sender.CAPACITY];
+                stream.ReadBytesIntoArray(ref readerCtx, ref infoBuffer, Sender.CAPACITY);
+                var resultString = Encoding.ASCII.GetString(infoBuffer);
+                Debug.Log("[SERVER] Got " + resultString + " from the Client: " + conn.InternalId);
+                var message = Decoder.Decode(resultString);
                 if (message != null && message.cmd == Commands.MOVEMENT){
                     dirty = true;
                     m_Players[conn.InternalId].position.x += message.movePlayer.x;
@@ -134,7 +127,7 @@ public class NetworkServer : MonoBehaviour
             }
             else if (cmd == NetworkEvent.Type.Disconnect)
             {
-                Debug.Log("Client disconnected from server with id: " + conn.InternalId);
+                Debug.Log("[SERVER] Client disconnected from server with id: " + conn.InternalId);
                 // Let's hope this will be later processed correctly at the disconnect thingie
                 conn = default(NetworkConnection);
             }
@@ -144,9 +137,9 @@ public class NetworkServer : MonoBehaviour
     {
         for (int i = 0; i < m_Connections.Length; i++)
         {
-            Debug.Log("Checking Connection " + i);
+            Debug.Log("[SERVER] Checking Connection " + i);
             if (!m_Connections[i].IsCreated){
-                Debug.Log("The connection " + i + " somehow has not been created yet - wtf? ");
+                Debug.Log("[SERVER] The connection " + i + " somehow has not been created yet - wtf? ");
                 Assert.IsTrue(true);
             }
             ReceiveData(i);
@@ -159,7 +152,7 @@ public class NetworkServer : MonoBehaviour
 
     void Update ()
     {
-        Debug.Log("Server is active!");
+        //Debug.Log("Server is active!");
         m_Driver.ScheduleUpdate().Complete();
         CleanUpConnections();
         AcceptNewConnections();
