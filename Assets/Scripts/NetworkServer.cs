@@ -26,7 +26,16 @@ public class NetworkServer : MonoBehaviour
         else
             m_Driver.Listen();
         m_Connections = new NativeList<NetworkConnection>(16, Allocator.Persistent);
+        InvokeRepeating("HeartBeat", 1, 1);  
     }
+
+    void HeartBeat(){
+        string message = Messager.Heartbeat();
+        for(int i = 0; i < m_Connections.Length; i++) {
+            Sender.SendData(message, m_Driver, m_Connections[i]);
+        }
+    }
+
 
     void SendDisconnectedPlayers()
     {
