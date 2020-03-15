@@ -124,8 +124,8 @@ public class NetworkServer : MonoBehaviour
                 Debug.Log("If we've received data then");
                 var readerCtx = default(DataStreamReader.Context);
                 var command = stream.ReadString(ref readerCtx);
-                Debug.Log("Got " + command + " from the Client: " + conn.InternalId);
-                var message = Decoder.Decode(command);
+                Debug.Log("Got " + command.ToString() + " from the Client: " + conn.InternalId);
+                var message = Decoder.Decode(command.ToString());
                 if (message != null && message.cmd == Commands.MOVEMENT){
                     dirty = true;
                     m_Players[conn.InternalId].position.x += message.movePlayer.x;
