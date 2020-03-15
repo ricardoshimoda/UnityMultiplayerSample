@@ -138,8 +138,14 @@ public class NetworkServer : MonoBehaviour
             else if (cmd == NetworkEvent.Type.Disconnect)
             {
                 Debug.Log("[SERVER] Client disconnected from server with id: " + conn.InternalId);
-                // Let's hope this will be later processed correctly at the disconnect thingie
                 conn = default(NetworkConnection);
+                m_DisconnectedPlayers.Add(m_Players[m_Connections[connIdx].InternalId]);
+                m_Players.Remove(m_Connections[connIdx].InternalId);
+                Debug.Log("[SERVER] Connection lost with " + m_Connections[connIdx].InternalId);
+                //var connTemp = m_Connections[i];
+                //connTemp.Dispose();
+                m_Connections.RemoveAtSwapBack(connIdx);
+                SendDisconnectedPlayers();
             }
         }
     }
