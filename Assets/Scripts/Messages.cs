@@ -38,4 +38,11 @@ public class Messager{
         MessageObj.movePlayer = movePlayer;
         return JsonUtility.ToJson(MessageObj);
     }
+
+    public static string Heartbeat(){
+        var MessageObj = new Message();
+        MessageObj.cmd = Commands.HEARTBEAT;
+        MessageObj.random = Random.Range(0f,100f);
+        return JsonUtility.ToJson(MessageObj);
+    }
 }

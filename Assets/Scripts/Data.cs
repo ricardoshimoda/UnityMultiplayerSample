@@ -6,7 +6,8 @@ public enum Commands{
     UPDATE,
     OTHERS,
     DELETE,
-    MOVEMENT
+    MOVEMENT,
+    HEARTBEAT
 };
 
 [Serializable]
@@ -53,5 +54,6 @@ public class Message{
     public Commands cmd;
     public Player[] players;
     public Movement movePlayer;
+    public float random;
 }
 

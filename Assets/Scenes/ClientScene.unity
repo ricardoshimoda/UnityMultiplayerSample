@@ -258,6 +258,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   serverAddress: 127.0.0.1
   serverPort: 12666
+  linearSpeed: 10
   m_Done: 0
 --- !u!1 &1478563798
 GameObject:

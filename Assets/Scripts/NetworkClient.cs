@@ -8,7 +8,7 @@ public class NetworkClient : MonoBehaviour
 {
     public string serverAddress = "127.0.0.1";
     public ushort serverPort = 12666;
-    public float linearSpeed = 100f;
+    public float linearSpeed = 10f;
     public UdpNetworkDriver m_Driver;
     public NetworkConnection m_Connection;
     public bool m_Done;
@@ -23,11 +23,17 @@ public class NetworkClient : MonoBehaviour
         var endpoint = NetworkEndPoint.Parse(serverAddress, serverPort);
         // endpoint.Port = 9000;
         m_Connection = m_Driver.Connect(endpoint);
-        Debug.Log("[CLIENT] Connection ID is: "  + m_Connection.InternalId);
+        InvokeRepeating("HeartBeat", 1, 1);  
+    }
+
+    void HeartBeat(){
+        string message = Messager.Heartbeat();
+        Sender.SendData(message, m_Driver, m_Connection);
     }
 
     public void OnDestroy()
     {
+        m_Connection.Disconnect(m_Driver);
         m_Done = true;
         m_Driver.Dispose();
         //m_Connection.Dispose();
