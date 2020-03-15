@@ -8,7 +8,7 @@ public class NetworkClient : MonoBehaviour
 {
     public string serverAddress = "127.0.0.1";
     public ushort serverPort = 12666;
-
+    public float linearSpeed = 100f;
     public UdpNetworkDriver m_Driver;
     public NetworkConnection m_Connection;
     public bool m_Done;
@@ -42,6 +42,31 @@ public class NetworkClient : MonoBehaviour
             if (!m_Done)
                 Debug.Log("[CLIENT] Something went wrong during connect");
             return;
+        }
+
+        // Verifies movement
+        bool sendMove = false;
+        var mov = new Movement();
+        if (Input.GetKey(KeyCode.A) || Input.GetKey(KeyCode.LeftArrow)){
+            sendMove = true;
+            mov.x += -linearSpeed * Time.deltaTime;
+        }
+        if (Input.GetKey(KeyCode.D) || Input.GetKey(KeyCode.RightArrow)){
+            sendMove = true;
+            mov.x += linearSpeed * Time.deltaTime;
+        }
+
+        if (Input.GetKey(KeyCode.W) || Input.GetKey(KeyCode.UpArrow)){
+            sendMove = true;
+            mov.y = linearSpeed * Time.deltaTime;
+        }
+        if (Input.GetKey(KeyCode.S) || Input.GetKey(KeyCode.DownArrow)){
+            sendMove = true;
+            mov.y = -linearSpeed * Time.deltaTime;
+        }
+        if(sendMove) {
+            string message = Messager.UpdatePosition(mov);
+            Sender.SendData(message, m_Driver, m_Connection);
         }
 
         DataStreamReader stream;
@@ -99,6 +124,16 @@ public class NetworkClient : MonoBehaviour
                                 pl.position.z
                             );
                     }
+                } else if (message.cmd == Commands.DELETE) {
+                    foreach(Player pl in message.players) {
+                        if(m_NetworkedCubes.ContainsKey(pl.id))
+                        {
+                            GameObject cube = m_NetworkedCubes[pl.id];
+                            Destroy(cube);
+                            m_NetworkedCubes.Remove(pl.id);
+                        }
+                    }
+
                 }
             }
             else if (cmd == NetworkEvent.Type.Disconnect)
@@ -106,8 +141,11 @@ public class NetworkClient : MonoBehaviour
                 Debug.Log("[CLIENT] Client got disconnected from server");
                 m_Connection = default(NetworkConnection);
                 m_Done = true;
+
             }
         }
+
+        // Verifies
         //Debug.Log("End of it all");
     }
 }
