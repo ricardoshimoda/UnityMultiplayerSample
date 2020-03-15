@@ -1,14 +1,20 @@
 ﻿using System;
+public enum Commands{
+    NEW_CLIENT,
+    UPDATE,
+    OTHERS,
+    DELETE
+};
 
 [Serializable]
-public class receivedColor{
+public class ReceivedColor{
     public float R;
     public float G;
     public float B;
 }
 
 [Serializable]
-public class serverPosition{
+public class ServerPosition{
     public float x;
     public float y;
     public float z;
@@ -17,19 +23,19 @@ public class serverPosition{
 [Serializable]
 public class Player{
     public string id;
-    public receivedColor color;    
-    public serverPosition position;    
+    public ReceivedColor color;    
+    public ServerPosition position;    
+}
+
+public class Movement{
+    public float x;
+    public float y;
 }
 
 [Serializable]
 public class Message{
-    public commands cmd;
+    public Commands cmd;
     public Player[] players;
+    public Movement movePlayer;
 }
 
-public enum commands{
-    NEW_CLIENT,
-    UPDATE,
-    OTHERS,
-    DELETE
-};
