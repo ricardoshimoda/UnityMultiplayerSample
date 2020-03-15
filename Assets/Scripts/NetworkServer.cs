@@ -47,6 +47,7 @@ public class NetworkServer : MonoBehaviour
     }
     void CleanUpConnections()
     {
+        bool oneDown = false;
         for (int i = 0; i < m_Connections.Length; i++)
         {
             if (!m_Connections[i].IsCreated)
@@ -58,9 +59,12 @@ public class NetworkServer : MonoBehaviour
                 //connTemp.Dispose();
                 m_Connections.RemoveAtSwapBack(i);
                 --i;
+                oneDown = true;
             }
         }
-        SendDisconnectedPlayers();
+        if(oneDown){
+            SendDisconnectedPlayers();
+        }
     }
     void SendNewChallenger(Player newPlayerData)
     {
@@ -114,15 +118,21 @@ public class NetworkServer : MonoBehaviour
             {
                 Debug.Log("[SERVER] If we've received data then");
                 var readerCtx = default(DataStreamReader.Context);
-                var infoBuffer = new byte[Sender.CAPACITY];
-                stream.ReadBytesIntoArray(ref readerCtx, ref infoBuffer, Sender.CAPACITY);
+                var infoBuffer = new byte[stream.Length];
+                stream.ReadBytesIntoArray(ref readerCtx, ref infoBuffer, stream.Length);
                 var resultString = Encoding.ASCII.GetString(infoBuffer);
                 Debug.Log("[SERVER] Got " + resultString + " from the Client: " + conn.InternalId);
                 var message = Decoder.Decode(resultString);
                 if (message != null && message.cmd == Commands.MOVEMENT){
                     dirty = true;
-                    m_Players[conn.InternalId].position.x += message.movePlayer.x;
-                    m_Players[conn.InternalId].position.y += message.movePlayer.y;
+                    if(m_Players.ContainsKey(conn.InternalId))
+                    {
+                        m_Players[conn.InternalId].position.x += message.movePlayer.x;
+                        m_Players[conn.InternalId].position.y += message.movePlayer.y;
+                    }
+                    else{
+                        Debug.Log("Cound not find player with Id: " + conn.InternalId);
+                    }
                 }
             }
             else if (cmd == NetworkEvent.Type.Disconnect)
