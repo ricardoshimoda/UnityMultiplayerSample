@@ -42,6 +42,7 @@ public class Player{
     }
 }
 
+[Serializable]
 public class Movement{
     public float x;
     public float y;
