@@ -16,10 +16,10 @@ public class NetworkClient : MonoBehaviour
     {
         m_Driver = new UdpNetworkDriver(new INetworkParameter[0]);
         m_Connection = default(NetworkConnection);
-
         var endpoint = NetworkEndPoint.Parse(serverAddress, serverPort);
         // endpoint.Port = 9000;
         m_Connection = m_Driver.Connect(endpoint);
+        Debug.Log("Connection ID is: "  + m_Connection.InternalId);
     }
 
     public void OnDestroy()
